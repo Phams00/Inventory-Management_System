@@ -44,3 +44,6 @@ test-results/
 
 # Prisma Generated
 apps/backend/src/generated/prisma/
+
+# TypeScript build cache
+*.tsbuildinfo
