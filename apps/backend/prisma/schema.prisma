@@ -39,6 +39,22 @@ enum WarehouseLocationType {
   TRANSIT
 }
 
+enum InventoryTransactionType {
+  RECEIPT
+  ISSUE
+  TRANSFER
+  ADJUSTMENT
+  PRODUCTION_ISSUE
+  PRODUCTION_RECEIPT
+  RETURN
+}
+
+enum InventoryTransactionStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
 // ==========================================
 // TENANT & USER
 // ==========================================
@@ -49,10 +65,11 @@ model Company {
   code   String        @unique
   status CompanyStatus @default(ACTIVE)
 
-  memberships CompanyUser[]
-  categories  ItemCategory[]
-  units       UnitOfMeasure[]
-  warehouses  Warehouse[]
+  memberships           CompanyUser[]
+  categories            ItemCategory[]
+  units                 UnitOfMeasure[]
+  warehouses            Warehouse[]
+  inventoryTransactions InventoryTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -149,7 +166,8 @@ model Item {
   category ItemCategory @relation(fields: [categoryId, companyId], references: [id, companyId], onDelete: Restrict)
   unit     UnitOfMeasure @relation(fields: [unitId, companyId], references: [id, companyId], onDelete: Restrict)
 
-  inventoryBalances InventoryBalance[]
+  inventoryLedgerEntries InventoryLedger[]
+  inventoryBalances      InventoryBalance[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -197,7 +215,8 @@ model WarehouseLocation {
 
   warehouse Warehouse @relation(fields: [warehouseId, companyId], references: [id, companyId], onDelete: Restrict)
 
-  inventoryBalances InventoryBalance[]
+  inventoryBalances      InventoryBalance[]
+  inventoryLedgerEntries InventoryLedger[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -232,4 +251,71 @@ model InventoryBalance {
   @@index([companyId, itemId])
   @@index([companyId, warehouseId, locationId])
   @@map("inventory_balances")
+}
+
+// ==========================================
+// INVENTORY TRANSACTION
+// ==========================================
+
+model InventoryTransaction {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  transactionNo   String
+  type            InventoryTransactionType
+  status          InventoryTransactionStatus @default(DRAFT)
+  transactionDate DateTime @default(now())
+
+  reference String?
+  notes     String?
+  postedAt  DateTime?
+
+  // Reversal relationship
+  reversalOfId String? @db.Uuid
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  reversalOf InventoryTransaction? @relation("TransactionReversal", fields: [reversalOfId, companyId], references: [id, companyId], onDelete: Restrict)
+  reversedBy InventoryTransaction? @relation("TransactionReversal")
+
+  ledgerEntries InventoryLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, companyId])
+  @@unique([companyId, transactionNo])
+  @@unique([reversalOfId, companyId])
+  @@index([companyId, type, status])
+  @@index([companyId, transactionDate])
+  @@map("inventory_transactions")
+}
+
+// ==========================================
+// INVENTORY LEDGER
+// ==========================================
+
+model InventoryLedger {
+  id            String @id @default(uuid()) @db.Uuid
+  companyId     String @db.Uuid
+  transactionId String @db.Uuid
+
+  warehouseId String @db.Uuid
+  locationId  String @db.Uuid
+  itemId      String @db.Uuid
+
+  quantityDelta Decimal @db.Decimal(18, 3)
+
+  transaction InventoryTransaction @relation(fields: [transactionId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  item Item @relation(fields: [itemId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  location WarehouseLocation @relation(fields: [locationId, warehouseId, companyId], references: [id, warehouseId, companyId], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, itemId, createdAt])
+  @@index([companyId, warehouseId, locationId])
+  @@index([transactionId, companyId])
+  @@map("inventory_ledger")
 }
