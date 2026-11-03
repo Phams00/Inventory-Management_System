@@ -7,3 +7,152 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum ItemType {
+  RAW_MATERIAL
+  WORK_IN_PROCESS
+  MRO
+  FINISHED_GOOD
+}
+
+// ==========================================
+// TENANT & USER MANAGEMENT
+// ==========================================
+
+model Company {
+  id     String        @id @default(uuid()) @db.Uuid
+  name   String
+  code   String        @unique
+  status CompanyStatus @default(ACTIVE)
+
+  memberships CompanyUser[]
+  categories  ItemCategory[]
+  units       UnitOfMeasure[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("companies")
+}
+
+model User {
+  id           String  @id @default(uuid()) @db.Uuid
+  email        String  @unique
+  passwordHash String
+  isActive     Boolean @default(true)
+
+  memberships CompanyUser[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model CompanyUser {
+  companyId String @db.Uuid
+  userId    String @db.Uuid
+
+  status   MembershipStatus @default(INVITED)
+  joinedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([companyId, userId])
+  @@index([userId, status])
+  @@index([companyId, status])
+  @@map("company_users")
+}
+
+// ==========================================
+// MASTER DATA: ITEM CATEGORY
+// ==========================================
+
+model ItemCategory {
+  id          String  @id @default(uuid()) @db.Uuid
+  companyId   String  @db.Uuid
+  name        String
+  description String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  items   Item[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, companyId])
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("item_categories")
+}
+
+// ==========================================
+// MASTER DATA: UNIT OF MEASURE
+// ==========================================
+
+model UnitOfMeasure {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+  code      String
+  name      String
+  symbol    String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  items   Item[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, companyId])
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("units_of_measure")
+}
+
+// ==========================================
+// MASTER DATA: ITEM
+// ==========================================
+
+model Item {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @db.Uuid
+  categoryId String   @db.Uuid
+  unitId     String   @db.Uuid
+
+  sku         String
+  name        String
+  description String?
+  itemType    ItemType
+  isActive    Boolean  @default(true)
+
+  category ItemCategory @relation(fields: [categoryId, companyId], references: [id, companyId], onDelete: Restrict)
+  unit     UnitOfMeasure @relation(fields: [unitId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, sku])
+  @@index([companyId, categoryId])
+  @@index([companyId, unitId])
+  @@index([companyId, itemType])
+  @@map("items")
+}
