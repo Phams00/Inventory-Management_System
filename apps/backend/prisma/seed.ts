@@ -124,6 +124,59 @@ const items: SeedItem[] = [
   { sku: "FG-PANEL-001", name: "Electrical Control Panel", description: "Panel kontrol listrik siap jual", category: "Finished Products", unit: "PCS", itemType: "FINISHED_GOOD" },
 ];
 
+
+const warehouseDefinitions = [
+  {
+    code: "WH-RM",
+    name: "Raw Material Warehouse",
+    address: "Building A - Raw Materials",
+    locations: [
+      { code: "RCV-01", name: "Receiving Area", type: "RECEIVING" },
+      { code: "RACK-A01", name: "Storage Rack A01", type: "STORAGE" },
+      { code: "RACK-A02", name: "Storage Rack A02", type: "STORAGE" },
+      { code: "QC-01", name: "Quality Inspection Area", type: "QUARANTINE" },
+      { code: "TRN-01", name: "Transfer Staging Area", type: "TRANSIT" },
+    ],
+  },
+  {
+    code: "WH-FG",
+    name: "Finished Goods Warehouse",
+    address: "Building B - Finished Goods",
+    locations: [
+      { code: "RCV-01", name: "Production Receiving", type: "RECEIVING" },
+      { code: "RACK-B01", name: "Finished Goods Rack B01", type: "STORAGE" },
+      { code: "RACK-B02", name: "Finished Goods Rack B02", type: "STORAGE" },
+      { code: "QC-01", name: "Final Quality Inspection", type: "QUARANTINE" },
+      { code: "SHP-01", name: "Shipping Preparation", type: "SHIPPING" },
+    ],
+  },
+  {
+    code: "WH-MRO",
+    name: "MRO Warehouse",
+    address: "Building C - Maintenance Supplies",
+    locations: [
+      { code: "RCV-01", name: "MRO Receiving", type: "RECEIVING" },
+      { code: "RACK-C01", name: "Tools and Equipment Rack", type: "STORAGE" },
+      { code: "RACK-C02", name: "Lubricants and Consumables Rack", type: "STORAGE" },
+      { code: "QC-01", name: "MRO Inspection Area", type: "QUARANTINE" },
+      { code: "TRN-01", name: "MRO Transfer Area", type: "TRANSIT" },
+    ],
+  },
+  {
+    code: "WH-PRD",
+    name: "Production Warehouse",
+    address: "Building D - Production",
+    locations: [
+      { code: "RCV-01", name: "Material Input Area", type: "RECEIVING" },
+      { code: "LINE-01", name: "Production Line 01", type: "PRODUCTION" },
+      { code: "LINE-02", name: "Production Line 02", type: "PRODUCTION" },
+      { code: "WIP-01", name: "Work In Process Area", type: "STORAGE" },
+      { code: "SHP-01", name: "Production Output Area", type: "SHIPPING" },
+    ],
+  },
+] as const;
+
+
 async function main() {
   console.log("Starting IMS industrial seed...");
 
@@ -214,6 +267,56 @@ async function main() {
         },
       });
     }
+
+    // Create warehouses and their locations
+    for (const warehouseData of warehouseDefinitions) {
+      const warehouse = await prisma.warehouse.upsert({
+        where: {
+          companyId_code: {
+            companyId: company.id,
+            code: warehouseData.code,
+          },
+        },
+        update: {
+          name: warehouseData.name,
+          address: warehouseData.address,
+        },
+        create: {
+          companyId: company.id,
+          code: warehouseData.code,
+          name: warehouseData.name,
+          address: warehouseData.address,
+        },
+      });
+
+      for (const locationData of warehouseData.locations) {
+        await prisma.warehouseLocation.upsert({
+          where: {
+            warehouseId_code: {
+              warehouseId: warehouse.id,
+              code: locationData.code,
+            },
+          },
+          update: {
+            name: locationData.name,
+            type: locationData.type,
+          },
+          create: {
+            companyId: company.id,
+            warehouseId: warehouse.id,
+            code: locationData.code,
+            name: locationData.name,
+            type: locationData.type,
+          },
+        });
+      }
+
+      console.log(`Warehouse ready: ${company.code}-${warehouse.code}`);
+    }
+
+    console.log(
+      `Master data ready: ${company.code} (${items.length} items, ${warehouseDefinitions.length} warehouses)`
+    );
 
     console.log(`Master data ready: ${company.code} (${items.length} items)`);
   }
