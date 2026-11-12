@@ -1,16 +1,23 @@
+
 import { randomBytes, createHash } from "node:crypto";
 import * as authRepository from "./repositories/auth.repository.js";
 
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
 
-// Generate SHA-256 hash
+// ==========================================
+// HASH REFRESH TOKEN
+// ==========================================
+
 export const hashRefreshToken = (token: string) => {
   return createHash("sha256")
     .update(token)
     .digest("hex");
 };
 
-// Generate new refresh token
+// ==========================================
+// GENERATE REFRESH TOKEN
+// ==========================================
+
 const generateRefreshToken = () => {
   const token = randomBytes(32).toString("base64url");
 
@@ -25,7 +32,10 @@ const generateRefreshToken = () => {
   };
 };
 
-// Create refresh token
+// ==========================================
+// CREATE REFRESH TOKEN
+// ==========================================
+
 export const createRefreshToken = async (userId: string) => {
   const refreshToken = generateRefreshToken();
 
@@ -41,7 +51,10 @@ export const createRefreshToken = async (userId: string) => {
   };
 };
 
-// Rotate refresh token
+// ==========================================
+// ROTATE REFRESH TOKEN
+// ==========================================
+
 export const rotateRefreshToken = async (token: string) => {
   const tokenHash = hashRefreshToken(token);
 
@@ -66,7 +79,25 @@ export const rotateRefreshToken = async (token: string) => {
   );
 
   return {
+    userId: session.userId,
     token: newRefreshToken.token,
     expiresAt: newRefreshToken.expiresAt
   };
+};
+
+// ==========================================
+// REVOKE REFRESH TOKEN (LOGOUT)
+// ==========================================
+
+export const revokeRefreshToken = async (token: string) => {
+  const tokenHash = hashRefreshToken(token);
+
+  const session =
+    await authRepository.findAuthSessionByTokenHash(tokenHash);
+
+  if (!session || session.revokedAt) {
+    return;
+  }
+
+  await authRepository.revokeAuthSession(session.id);
 };

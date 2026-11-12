@@ -1,8 +1,8 @@
-
 import express from "express";
 import cors from "cors";
 import inventoryTransactionRoutes from "./modules/inventory/routes/inventory-transaction.routes.js";
-
+import authRoutes from "./modules/auth/routes/auth.routes.js";
+import cookieParser from "cookie-parser";
 import { prisma } from "./config/database.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
@@ -11,7 +11,9 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 app.use("/api/v1/inventory/transactions", inventoryTransactionRoutes);
+app.use("/api/v1/auth", authRoutes);
 
 app.get("/health", async (_req, res) => {
   try {
